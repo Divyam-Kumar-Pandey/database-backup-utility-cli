@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var rootCmd = &cobra.Command{
@@ -28,7 +29,22 @@ var initCmd = &cobra.Command{
 	},
 }
 
+func initConfig() {
+	viper.SetConfigName("db_backup_config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+	viper.AutomaticEnv()
+
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Println("No config file found, run `backup-tool init`")
+	} else {
+		fmt.Println("Config file initialized.")
+	}
+}
+
+
 func init() {
+	cobra.OnInitialize(initConfig)
 	rootCmd.AddCommand(initCmd)
 }
 
