@@ -1,6 +1,8 @@
 package main
 
 import (
+	"db-backup-cli/pkg/core"
+	"db-backup-cli/pkg/databases"
 	"fmt"
 	"os"
 
@@ -42,10 +44,53 @@ func initConfig() {
 	}
 }
 
+var backupCmd = &cobra.Command{
+	Use: "backup [database]",
+	Short: "Backup a Database",
+	Args: cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		var databaseName = args[0]
+
+		if !viper.IsSet("databases." + databaseName) {
+			fmt.Printf("Database '%s' not found in config\n", databaseName); 
+			return
+		}
+
+		dbConfig := viper.GetStringMap("databases." + databaseName)
+		dbType := dbConfig["type"].(string)
+
+		dbAdapter, err := getDatabaseAdapter(dbType)
+		if err != nil {
+			fmt.Println(err); return;
+		}
+
+		outputFile := databaseName + "_backup.sql";
+		path, err := dbAdapter.Backup(dbConfig, outputFile)
+		if err != nil {
+			fmt.Println("Backup failed", err)
+			return;
+		}
+
+		fmt.Println("backup created at: ", path)
+
+	},
+}
+
+func getDatabaseAdapter(dbType string) (core.Database, error) {
+	switch dbType {
+	case "mysql":
+		return &databases.MySQLDatabase{}, nil
+	default:
+		return nil, fmt.Errorf("unsupported database type: %s", dbType)
+	}
+}
+
+
 
 func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(backupCmd)
 }
 
 func main() {
