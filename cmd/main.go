@@ -3,9 +3,11 @@ package main
 import (
 	"db-backup-cli/pkg/core"
 	"db-backup-cli/pkg/databases"
+	"db-backup-cli/pkg/storage"
 	"db-backup-cli/pkg/utils"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -58,7 +60,16 @@ var backupCmd = &cobra.Command{
 		}
 
 		dbConfig := viper.GetStringMap("databases." + databaseName)
+		storageConfig := viper.GetStringMap("storage")
 		dbType := dbConfig["type"].(string)
+
+		storageAdaptor, err := getStorageAdaptor(storageConfig["type"].(string))
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		
 
 		dbAdapter, err := getDatabaseAdapter(dbType)
 		if err != nil {
@@ -78,7 +89,16 @@ var backupCmd = &cobra.Command{
 			return
 		}
 		os.Remove(path)
-		fmt.Println("backup created at: ", compressedPath)
+
+		finalPath := filepath.Join(storageConfig["path"].(string), filepath.Base(compressedPath))
+
+		uploadedPath, err := storageAdaptor.Upload(compressedPath, finalPath)
+		if err != nil {
+			fmt.Println("Upload failed:", err)
+			return
+		}
+		os.Remove(compressedPath)
+		fmt.Println("backup created at: ", uploadedPath)
 	},
 }
 
@@ -88,6 +108,15 @@ func getDatabaseAdapter(dbType string) (core.Database, error) {
 		return &databases.MySQLDatabase{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported database type: %s", dbType)
+	}
+}
+
+func getStorageAdaptor(storageType string) (core.Storage, error) {
+	switch storageType {
+	case "local":
+		return &storage.LocalStorage{}, nil
+	default:
+		return nil, fmt.Errorf("unsupported storage type: %s", storageType)
 	}
 }
 

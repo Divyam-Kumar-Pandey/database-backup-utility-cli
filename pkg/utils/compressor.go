@@ -25,7 +25,7 @@ func CompressFile(inputPath string) (string, error) {
 	defer out.Close()
 
 	gzWriter := gzip.NewWriter(out)
-	gzWriter.Close()
+	defer gzWriter.Close()
 
 	if _, err := io.Copy(gzWriter, in); err != nil {
 		return "", err
