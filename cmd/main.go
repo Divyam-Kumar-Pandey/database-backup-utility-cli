@@ -3,6 +3,7 @@ package main
 import (
 	"db-backup-cli/pkg/core"
 	"db-backup-cli/pkg/databases"
+	"db-backup-cli/pkg/utils"
 	"fmt"
 	"os"
 
@@ -71,8 +72,13 @@ var backupCmd = &cobra.Command{
 			return;
 		}
 
-		fmt.Println("backup created at: ", path)
-
+		compressedPath, err := utils.CompressFile(path)
+		if err != nil {
+			fmt.Println("Compression failed:", err)
+			return
+		}
+		os.Remove(path)
+		fmt.Println("backup created at: ", compressedPath)
 	},
 }
 

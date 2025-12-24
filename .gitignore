@@ -35,6 +35,7 @@ main
 # backups
 backups/
 *.sql
+*.gz
 
 # config
 db_backup_config.yaml
