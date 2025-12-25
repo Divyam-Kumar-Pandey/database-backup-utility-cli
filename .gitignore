@@ -37,5 +37,7 @@ backups/
 *.sql
 *.gz
 
+# logs
+db-backup-cli.log
 # config
 db_backup_config.yaml

@@ -15,14 +15,14 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use: "db-backup",
+	Use:   "db-backup",
 	Short: "Database Backup Utility Tool CLI",
 }
 
 func execute() {
 	err := rootCmd.Execute()
 	if err != nil {
-		fmt.Println("Error: ", err)
+		handleError("Error executing command", err)
 		os.Exit(1)
 	}
 }
@@ -31,7 +31,7 @@ var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize configuration",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Configuration initialized.")
+		utils.LogInfo("Configuration initialized.")
 	},
 }
 
@@ -42,21 +42,22 @@ func initConfig() {
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {
-		fmt.Println("No config file found, run `backup-tool init`")
+		handleError("No config file found, run `backup-tool init`", err)
 	} else {
-		fmt.Println("Config file initialized.")
+		utils.LogInfo("Config file initialized.")
 	}
 }
 
 var backupCmd = &cobra.Command{
-	Use: "backup [database]",
+	Use:   "backup [database]",
 	Short: "Backup a Database",
-	Args: cobra.ExactArgs(1),
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		utils.LogInfo("Starting backup...")
 		var databaseName = args[0]
 
 		if !viper.IsSet("databases." + databaseName) {
-			fmt.Printf("Database '%s' not found in config\n", databaseName); 
+			handleError(fmt.Sprintf("Database '%s' not found in config", databaseName), nil)
 			return
 		}
 
@@ -66,40 +67,42 @@ var backupCmd = &cobra.Command{
 
 		storageAdaptor, err := getStorageAdapter()
 		if err != nil {
-			fmt.Println(err)
+			handleError("Failed to get storage adapter", err)
 			return
 		}
-
-		
 
 		dbAdapter, err := getDatabaseAdapter(dbType)
 		if err != nil {
-			fmt.Println(err); return;
+			handleError("Failed to get database adapter", err)
+			return
 		}
 
-		outputFile := databaseName + "_backup.sql";
+		outputFile := databaseName + "_backup.sql"
 		path, err := dbAdapter.Backup(dbConfig, outputFile)
 		if err != nil {
-			fmt.Println("Backup failed", err)
-			return;
+			handleError("Backup failed", err)
+			return
 		}
+		utils.LogInfo("Database dump completed successfully")
 
 		compressedPath, err := utils.CompressFile(path)
 		if err != nil {
-			fmt.Println("Compression failed:", err)
+			handleError("Compression failed", err)
 			return
 		}
+		utils.LogInfo("Compression completed successfully")
 		os.Remove(path)
 
 		finalPath := filepath.Join(storageConfig["path"].(string), filepath.Base(compressedPath))
 
 		uploadedPath, err := storageAdaptor.Upload(compressedPath, finalPath)
 		if err != nil {
-			fmt.Println("Upload failed:", err)
+			handleError("Upload failed", err)
 			return
 		}
+		utils.LogInfo("Upload completed successfully")
 		os.Remove(compressedPath)
-		fmt.Println("Backup created at: ", uploadedPath)
+		utils.LogInfo("Backup created at: " + uploadedPath)
 	},
 }
 
@@ -116,27 +119,33 @@ func getStorageAdapter() (core.Storage, error) {
 	storageType := viper.GetString("storage.type")
 
 	switch storageType {
-		case "local":
-			return &storage.LocalStorage{}, nil
-		case "s3":
-			bucket := viper.GetString("storage.bucket");
-			region := viper.GetString("storage.region")
-			return storage.NewS3Storage(bucket, region)
-		default:
-			return nil, fmt.Errorf("unsupported storage type: %s", storageType)
+	case "local":
+		return &storage.LocalStorage{}, nil
+	case "s3":
+		bucket := viper.GetString("storage.bucket")
+		region := viper.GetString("storage.region")
+		return storage.NewS3Storage(bucket, region)
+	default:
+		return nil, fmt.Errorf("unsupported storage type: %s", storageType)
 	}
 }
 
+func handleError(userMsg string, err error) {
+	utils.LogError(userMsg + ": " + err.Error())
+	fmt.Println(userMsg)
+}
+
 var restoreCmd = &cobra.Command{
-	Use: "restore [backup_file] [db_name]",
+	Use:   "restore [backup_file] [db_name]",
 	Short: "Restore a Database",
-	Args: cobra.ExactArgs(2),
+	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
+		utils.LogInfo("Starting restore...")
 		backupFile := args[0]
 		dbName := args[1]
 
 		if !viper.IsSet("databases." + dbName) {
-			fmt.Println("Database not found:", dbName)
+			handleError(fmt.Sprintf("Database not found: %s", dbName), nil)
 			return
 		}
 
@@ -146,57 +155,60 @@ var restoreCmd = &cobra.Command{
 
 		dbAdapter, err := getDatabaseAdapter(dbType)
 		if err != nil {
-			fmt.Println(err)
+			handleError("Failed to get database adapter", err)
 			return
 		}
 
 		storageAdapter, err := getStorageAdapter()
 		if err != nil {
-			fmt.Println(err)
+			handleError("Failed to get storage adapter", err)
 			return
 		}
 
 		tempPath := filepath.Join(os.TempDir(), filepath.Base(backupFile))
 
-		fmt.Println("Downloading backup...")
+		utils.LogInfo("Downloading backup...")
 		localPath, err := storageAdapter.Download(backupFile, tempPath)
 		if err != nil {
-			fmt.Println("Download failed:", err)
+			handleError("Download failed", err)
 			return
 		}
 
 		restorePath := localPath
 		if strings.HasSuffix(localPath, ".gz") {
-			fmt.Println("Decompressing backup...")
+			utils.LogInfo("Decompressing backup...")
 			restorePath, err = utils.DecompressFile(localPath)
 			if err != nil {
-				fmt.Println("Decompression failed:", err)
+				handleError("Decompression failed", err)
 				return
 			}
 		}
 
-		fmt.Println("Restoring database...")
+		utils.LogInfo("Restoring database...")
 		if err := dbAdapter.Restore(dbConfig, restorePath); err != nil {
-			fmt.Println("Restore failed:", err)
+			handleError("Restore failed", err)
 			return
 		}
-
-		fmt.Println("Restore completed successfully")
 
 		os.Remove(localPath)
 		if restorePath != localPath {
 			os.Remove(restorePath)
 		}
+
+		utils.LogInfo("Restore completed successfully")
 	},
 }
 
 func init() {
+	utils.InitLogger()
 	cobra.OnInitialize(initConfig)
+
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(backupCmd)
 	rootCmd.AddCommand(restoreCmd)
 }
 
 func main() {
+	// defer utils.CloseLogger()
 	execute()
 }
