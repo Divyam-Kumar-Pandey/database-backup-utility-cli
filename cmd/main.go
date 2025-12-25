@@ -64,7 +64,7 @@ var backupCmd = &cobra.Command{
 		storageConfig := viper.GetStringMap("storage")
 		dbType := dbConfig["type"].(string)
 
-		storageAdaptor, err := getStorageAdapter(storageConfig["type"].(string))
+		storageAdaptor, err := getStorageAdapter()
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -112,12 +112,18 @@ func getDatabaseAdapter(dbType string) (core.Database, error) {
 	}
 }
 
-func getStorageAdapter(storageType string) (core.Storage, error) {
+func getStorageAdapter() (core.Storage, error) {
+	storageType := viper.GetString("storage.type")
+
 	switch storageType {
-	case "local":
-		return &storage.LocalStorage{}, nil
-	default:
-		return nil, fmt.Errorf("unsupported storage type: %s", storageType)
+		case "local":
+			return &storage.LocalStorage{}, nil
+		case "s3":
+			bucket := viper.GetString("storage.bucket");
+			region := viper.GetString("storage.region")
+			return storage.NewS3Storage(bucket, region)
+		default:
+			return nil, fmt.Errorf("unsupported storage type: %s", storageType)
 	}
 }
 
@@ -135,7 +141,7 @@ var restoreCmd = &cobra.Command{
 		}
 
 		dbConfig := viper.GetStringMap("databases." + dbName)
-		storageConfig := viper.GetStringMap("storage")
+		// storageConfig := viper.GetStringMap("storage")
 		dbType := dbConfig["type"].(string)
 
 		dbAdapter, err := getDatabaseAdapter(dbType)
@@ -144,7 +150,7 @@ var restoreCmd = &cobra.Command{
 			return
 		}
 
-		storageAdapter, err := getStorageAdapter(storageConfig["type"].(string))
+		storageAdapter, err := getStorageAdapter()
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -175,7 +181,7 @@ var restoreCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Println("Restore completed successfully ✅")
+		fmt.Println("Restore completed successfully")
 
 		os.Remove(localPath)
 		if restorePath != localPath {
