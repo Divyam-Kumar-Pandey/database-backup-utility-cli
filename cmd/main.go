@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -63,7 +64,7 @@ var backupCmd = &cobra.Command{
 		storageConfig := viper.GetStringMap("storage")
 		dbType := dbConfig["type"].(string)
 
-		storageAdaptor, err := getStorageAdaptor(storageConfig["type"].(string))
+		storageAdaptor, err := getStorageAdapter(storageConfig["type"].(string))
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -98,7 +99,7 @@ var backupCmd = &cobra.Command{
 			return
 		}
 		os.Remove(compressedPath)
-		fmt.Println("backup created at: ", uploadedPath)
+		fmt.Println("Backup created at: ", uploadedPath)
 	},
 }
 
@@ -111,7 +112,7 @@ func getDatabaseAdapter(dbType string) (core.Database, error) {
 	}
 }
 
-func getStorageAdaptor(storageType string) (core.Storage, error) {
+func getStorageAdapter(storageType string) (core.Storage, error) {
 	switch storageType {
 	case "local":
 		return &storage.LocalStorage{}, nil
@@ -120,12 +121,74 @@ func getStorageAdaptor(storageType string) (core.Storage, error) {
 	}
 }
 
+var restoreCmd = &cobra.Command{
+	Use: "restore [backup_file] [db_name]",
+	Short: "Restore a Database",
+	Args: cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		backupFile := args[0]
+		dbName := args[1]
 
+		if !viper.IsSet("databases." + dbName) {
+			fmt.Println("Database not found:", dbName)
+			return
+		}
+
+		dbConfig := viper.GetStringMap("databases." + dbName)
+		storageConfig := viper.GetStringMap("storage")
+		dbType := dbConfig["type"].(string)
+
+		dbAdapter, err := getDatabaseAdapter(dbType)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		storageAdapter, err := getStorageAdapter(storageConfig["type"].(string))
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		tempPath := filepath.Join(os.TempDir(), filepath.Base(backupFile))
+
+		fmt.Println("Downloading backup...")
+		localPath, err := storageAdapter.Download(backupFile, tempPath)
+		if err != nil {
+			fmt.Println("Download failed:", err)
+			return
+		}
+
+		restorePath := localPath
+		if strings.HasSuffix(localPath, ".gz") {
+			fmt.Println("Decompressing backup...")
+			restorePath, err = utils.DecompressFile(localPath)
+			if err != nil {
+				fmt.Println("Decompression failed:", err)
+				return
+			}
+		}
+
+		fmt.Println("Restoring database...")
+		if err := dbAdapter.Restore(dbConfig, restorePath); err != nil {
+			fmt.Println("Restore failed:", err)
+			return
+		}
+
+		fmt.Println("Restore completed successfully ✅")
+
+		os.Remove(localPath)
+		if restorePath != localPath {
+			os.Remove(restorePath)
+		}
+	},
+}
 
 func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(backupCmd)
+	rootCmd.AddCommand(restoreCmd)
 }
 
 func main() {

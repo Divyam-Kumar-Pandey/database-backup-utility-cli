@@ -42,6 +42,35 @@ func (db *MySQLDatabase) Backup(config core.Config, outputPath string) (string, 
 }
 
 func (db *MySQLDatabase) Restore(config core.Config, backupPath string) error {
+	user := config["user"].(string)
+	password := config["password"].(string)
+	host := config["host"].(string)
+	port := config["port"].(int)
+	database := config["database"].(string)
+
+	file, err := os.Open(backupPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	cmd := exec.Command(
+		"mysql",
+		fmt.Sprintf("-u%s", user),
+		fmt.Sprintf("-p%s", password),
+		fmt.Sprintf("-h%s", host),
+		fmt.Sprintf("-P%d", port),
+		database,
+	)
+
+	cmd.Stdin = file
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("mysql restore failed: %w", err)
+	}
+
 	return nil
 }
 
