@@ -38,6 +38,6 @@ backups/
 *.gz
 
 # logs
-db-backup-cli.log
+db_backup.log
 # config
 db_backup_config.yaml

@@ -7,6 +7,7 @@ import (
 	"db-backup-cli/pkg/utils"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -39,6 +40,8 @@ func initConfig() {
 	viper.SetConfigName("db_backup_config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
+
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {
@@ -62,6 +65,10 @@ var backupCmd = &cobra.Command{
 		}
 
 		dbConfig := viper.GetStringMap("databases." + databaseName)
+		pwdKey := fmt.Sprintf("databases.%s.password", databaseName)
+		if pwd := viper.GetString(pwdKey); pwd != "" {
+			dbConfig["password"] = pwd
+		}
 		storageConfig := viper.GetStringMap("storage")
 		dbType := dbConfig["type"].(string)
 
@@ -150,6 +157,10 @@ var restoreCmd = &cobra.Command{
 		}
 
 		dbConfig := viper.GetStringMap("databases." + dbName)
+		pwdKey := fmt.Sprintf("databases.%s.password", dbName)
+		if pwd := viper.GetString(pwdKey); pwd != "" {
+			dbConfig["password"] = pwd
+		}
 		// storageConfig := viper.GetStringMap("storage")
 		dbType := dbConfig["type"].(string)
 
@@ -199,13 +210,65 @@ var restoreCmd = &cobra.Command{
 	},
 }
 
+var scheduleCmd = &cobra.Command{
+	Use:   "schedule",
+	Short: "Manage backup schedules",
+}
+
+var scheduleAddCmd = &cobra.Command{
+	Use: "add [db_name] [cron]",
+	Short: "Schedule a database backup",
+	Args: cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		dbName := args[0]
+		cronExpr := args[1]
+
+		binary, _ := exec.LookPath(os.Args[0])
+
+		command := fmt.Sprintf(
+			"%s backup %s >> %s 2>&1",
+			binary,
+			dbName,
+			"backup_tool.log",
+		)
+
+		err := utils.AddCronJob(dbName, cronExpr, command)
+		if err != nil {
+			handleError("Failed to add schedule", err)
+			return
+		}
+
+		utils.LogInfo("Backup scheduled successfully")
+	},
+}
+
+var scheduleRemoveCmd = &cobra.Command{
+	Use:   "remove [db_name]",
+	Short: "Remove scheduled backup",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := utils.RemoveCronJob(args[0]); err != nil {
+			handleError("Failed to remove schedule", err)
+			return
+		}
+
+		utils.LogInfo("Schedule removed successfully")
+	},
+}
+
+
+
 func init() {
 	utils.InitLogger()
 	cobra.OnInitialize(initConfig)
 
+	scheduleCmd.AddCommand(scheduleAddCmd)
+	scheduleCmd.AddCommand(scheduleRemoveCmd)
+
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(backupCmd)
 	rootCmd.AddCommand(restoreCmd)
+	rootCmd.AddCommand(scheduleCmd)
 }
 
 func main() {

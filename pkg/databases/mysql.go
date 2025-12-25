@@ -19,10 +19,13 @@ func (db *MySQLDatabase) Backup(config core.Config, outputPath string) (string, 
 	cmd := exec.Command(
 		"mysqldump",
 		fmt.Sprintf("-u%s", user),
-		fmt.Sprintf("-p%s", password),
 		fmt.Sprintf("-h%s", host),
 		fmt.Sprintf("-P%d", port),
 		database,
+	)
+	
+	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("MYSQL_PWD=%s", password),
 	)
 
 	file, err := os.Create(outputPath)
@@ -57,10 +60,13 @@ func (db *MySQLDatabase) Restore(config core.Config, backupPath string) error {
 	cmd := exec.Command(
 		"mysql",
 		fmt.Sprintf("-u%s", user),
-		fmt.Sprintf("-p%s", password),
 		fmt.Sprintf("-h%s", host),
 		fmt.Sprintf("-P%d", port),
 		database,
+	)
+	
+	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("MYSQL_PWD=%s", password),
 	)
 
 	cmd.Stdin = file

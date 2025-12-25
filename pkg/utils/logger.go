@@ -15,7 +15,7 @@ var (
 func InitLogger() {
 	var err error
 	logFile, err = os.OpenFile(
-		"db-backup-cli.log",
+		"db_backup.log",
 		os.O_CREATE|os.O_WRONLY|os.O_APPEND,
 		0644,
 	)
