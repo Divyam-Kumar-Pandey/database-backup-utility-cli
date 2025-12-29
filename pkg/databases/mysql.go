@@ -23,7 +23,7 @@ func (db *MySQLDatabase) Backup(config core.Config, outputPath string) (string, 
 		fmt.Sprintf("-P%d", port),
 		database,
 	)
-	
+
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("MYSQL_PWD=%s", password),
 	)
@@ -64,7 +64,7 @@ func (db *MySQLDatabase) Restore(config core.Config, backupPath string) error {
 		fmt.Sprintf("-P%d", port),
 		database,
 	)
-	
+
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("MYSQL_PWD=%s", password),
 	)
@@ -81,6 +81,27 @@ func (db *MySQLDatabase) Restore(config core.Config, backupPath string) error {
 }
 
 func (db *MySQLDatabase) TestConnection(config core.Config) error {
+	user := config["user"].(string)
+	password := config["password"].(string)
+	host := config["host"].(string)
+	port := config["port"].(int)
+	database := config["database"].(string)
+
+	cmd := exec.Command(
+		"mysql",
+		fmt.Sprintf("-u%s", user),
+		fmt.Sprintf("-h%s", host),
+		fmt.Sprintf("-P%d", port),
+		"-e",
+		"SELECT 1",
+		database,
+	)
+	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("MYSQL_PWD=%s", password),
+	)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("mysql test connection failed: %w", err)
+	}
+
 	return nil
 }
-

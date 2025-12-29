@@ -35,11 +35,11 @@ func InitLogger() {
 	)
 }
 
-// func CloseLogger() {
-// 	if logFile != nil {
-// 		_ = logFile.Close()
-// 	}
-// }
+func CloseLogger() {
+	if logFile != nil {
+		_ = logFile.Close()
+	}
+}
 
 func LogInfo(msg string) {
 	fmt.Println("INFO: " + msg)

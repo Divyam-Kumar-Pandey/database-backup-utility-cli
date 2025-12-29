@@ -9,11 +9,11 @@ A **production-ready, cloud-capable database backup and restore CLI** written in
 ### 🔄 Database Support
 
 * **MySQL** (via native `mysqldump` / `mysql`)
+* **MongoDB** (via native `mongodump` / `mongorestore`)
+* **SQLite** (file-level copy)
 * Architecture designed for future database support:
-
   * PostgreSQL
-  * MongoDB 
-  * SQLite
+
 
 ### 📦 Backup Pipeline
 
@@ -43,8 +43,8 @@ Database → SQL dump → Gzip compression → Storage backend
 * Fully manageable from CLI
 
 ```bash
-backup-tool schedule add my_db "0 2 * * *"
-backup-tool schedule remove my_db
+db-backup-cli schedule add my_db "0 2 * * *"
+db-backup-cli schedule remove my_db
 ```
 
 ---
@@ -128,17 +128,10 @@ db-backup-cli backup my_mysql
 db-backup-cli restore backups/my_mysql_backup.sql.gz my_mysql
 ```
 
-### List Stored Backups
-
-```bash
-db-backup-cli list
-```
-
 ### Schedule Automatic Backups
 
 ```bash
 db-backup-cli schedule add my_mysql "0 2 * * *"
-db-backup-cli schedule list
 db-backup-cli schedule remove my_mysql
 ```
 
@@ -150,7 +143,7 @@ db-backup-cli schedule remove my_mysql
 cmd/main.go              → CLI entrypoint (Cobra)
 pkg/
  ├── core/               → Interfaces (Database, Storage)
- ├── databases/          → MySQL adapter (Postgres/Mongo planned)
+ ├── databases/          → MySQL, MongoDB, SQLite adapters (Postgres planned)
  ├── storage/            → Local & AWS S3 adapters
  └── utils/              → Logging, compression, cron, security
 ```
@@ -185,8 +178,8 @@ These are **intentional next-phase improvements**, not missing basics:
 ### 🔄 Database Support
 
 * [ ] PostgreSQL adapter
-* [ ] MongoDB adapter
-* [ ] SQLite adapter
+* [x] MongoDB adapter
+* [x] SQLite adapter
 
 ### ☁️ Storage
 

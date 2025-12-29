@@ -10,7 +10,7 @@ type LocalStorage struct{}
 
 func (l *LocalStorage) Upload(localPath, remotePath string) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(remotePath), 0755); err != nil {
-		return "", nil
+		return "", err
 	}
 
 	src, err := os.Open(localPath)
@@ -46,12 +46,27 @@ func (l *LocalStorage) Download(remotePath, localPath string) (string, error) {
 	defer dst.Close()
 
 	if _, err := io.Copy(dst, src); err != nil {
-		return "", nil
+		return "", err
 	}
 
 	return localPath, nil
 }
 
 func (l *LocalStorage) ListFiles(path string) ([]string, error) {
-	return []string{}, nil
+	var files []string
+
+	err := filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			files = append(files, p)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return files, nil
 }

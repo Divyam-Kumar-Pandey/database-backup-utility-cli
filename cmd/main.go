@@ -45,7 +45,7 @@ func initConfig() {
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {
-		handleError("No config file found, run `backup-tool init`", err)
+		handleError("No config file found, run `db-backup-cli init`", err)
 	} else {
 		utils.LogInfo("Config file initialized.")
 	}
@@ -117,6 +117,10 @@ func getDatabaseAdapter(dbType string) (core.Database, error) {
 	switch dbType {
 	case "mysql":
 		return &databases.MySQLDatabase{}, nil
+	case "sqlite":
+		return &databases.SQLiteDatabase{}, nil
+	case "mongo":
+		return &databases.MongoDatabase{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported database type: %s", dbType)
 	}
@@ -138,7 +142,11 @@ func getStorageAdapter() (core.Storage, error) {
 }
 
 func handleError(userMsg string, err error) {
-	utils.LogError(userMsg + ": " + err.Error())
+	if err != nil {
+		utils.LogError(userMsg + ": " + err.Error())
+	} else {
+		utils.LogError(userMsg)
+	}
 	fmt.Println(userMsg)
 }
 
@@ -272,6 +280,6 @@ func init() {
 }
 
 func main() {
-	// defer utils.CloseLogger()
+	defer utils.CloseLogger()
 	execute()
 }
